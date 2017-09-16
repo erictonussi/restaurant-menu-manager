@@ -45,7 +45,7 @@ function menu_entries_post_type() {
 		'not_found_in_trash'  => __( 'No Restaurant Menu Entries found in trash', 'restaurant-menu-manager' ),
 	);
 	$rewrite = array(
-		'slug'                => 'menu-item',
+		'slug'                => 'produto',
 		'with_front'          => true,
 		'pages'               => true,
 		'feeds'               => true,
@@ -54,7 +54,7 @@ function menu_entries_post_type() {
 		'label'               => __( 'restaurant-menu-entry', 'restaurant-menu-manager' ),
 		'description'         => __( 'Items or entries in your restaurant menu', 'restaurant-menu-manager' ),
 		'labels'              => $labels,
-		'supports'            => array( 'title', 'editor', 'thumbnail', 'comments', 'revisions', 'excerpt', 'custom-fields' ),
+		'supports'            => array( 'title', 'editor', 'thumbnail', /*'comments',*/ 'revisions', 'excerpt', 'custom-fields' ),
 		'taxonomies'          => array( 'rm-menu-type' ),
 		'hierarchical'        => false,
 		'public'              => true,
@@ -73,6 +73,145 @@ function menu_entries_post_type() {
 	register_post_type( 'rm-menu-entry', $args );
 }
 add_action( 'init', 'menu_entries_post_type' ,0);
+
+add_action( 'add_meta_boxes', 'dynamic_add_custom_box' );
+
+/* Do something with the data entered */
+add_action( 'save_post', 'dynamic_save_postdata' );
+
+/* Adds a box to the main column on the Post and Page edit screens */
+function dynamic_add_custom_box() {
+    add_meta_box(
+        'dynamic_sectionid',
+        __( 'Valores', 'myplugin_textdomain' ),
+        'dynamic_inner_custom_box',
+        'rm-menu-entry');
+}
+
+/* Prints the box content */
+function dynamic_inner_custom_box($object, $box) {
+    // global $post;
+    // Use nonce for verification
+    wp_nonce_field( plugin_basename( __FILE__ ), 'dynamicMeta_noncename' );
+    ?>
+    <div id="meta_inner">
+    <?php
+
+    //get the saved meta as an array
+    $prices = get_post_meta($object->ID, 'prices', false);
+    // var_dump($prices);
+
+    $c = 0;
+    if ( $prices && count( $prices[0] ) > 0 ) {
+        foreach( $prices[0] as $track ) {
+            if ( sizeof( $track['title'] ) || sizeof( $track['track'] ) ) {
+                printf( '<p>Descrição <input type="text" name="prices[%1$s][title]" value="%2$s" /> -- Valor : <input type="text" name="prices[%1$s][track]" value="%3$s" /> <span class="button remove">%4$s</span></p>', $c, $track['title'], $track['track'], __( 'Remover' ) );
+                $c = $c +1;
+            }
+        }
+    }
+    // printf( '<p>Descrição <input type="text" name="prices[%1$s][title]" value="%2$s" /> -- Valor : <input type="text" name="prices[%1$s][track]" value="%3$s" /> <span class="button remove">%4$s</span></p>', $c+1, '', '', __( 'Remover' ) );
+
+    ?>
+<span id="here"></span>
+<span class="add button button-primary right" st><?php _e('Adicionar valor'); ?></span>
+<span class="clear"></span>
+<script>
+    var $ =jQuery.noConflict();
+    $(document).ready(function() {
+        var count = <?php echo $c+1; ?>;
+        $(".add").click(function() {
+            count = count + 1;
+
+            $('#here').append('<p> Descrição <input type="text" name="prices['+count+'][title]" value="" /> -- Valor : <input type="text" name="prices['+count+'][track]" value="" /> <span class="button remove">Remover</span></p>' );
+            return false;
+        });
+        $(".remove").live('click', function() {
+            $(this).parent().remove();
+        });
+    });
+    </script>
+</div><span class="clear"></span><?php
+
+}
+
+/* When the post is saved, saves our custom data */
+function dynamic_save_postdata( $post_id ) {
+	// var_dump($_POST); die();
+    // verify if this is an auto save routine.
+    // If it is our form has not been submitted, so we dont want to do anything
+    if ( defined( 'DOING_AUTOSAVE' ) && DOING_AUTOSAVE )
+        return;
+
+    // verify this came from the our screen and with proper authorization,
+    // because save_post can be triggered at other times
+    if ( !isset( $_POST['dynamicMeta_noncename'] ) )
+        return;
+
+    if ( !wp_verify_nonce( $_POST['dynamicMeta_noncename'], plugin_basename( __FILE__ ) ) )
+        return;
+
+    // OK, we're authenticated: we need to find and save the data
+
+    $prices = $_POST['prices'];
+
+    update_post_meta($post_id,'prices',$prices);
+}
+
+
+/*add_action("add_meta_boxes", "add_meta_boxes");
+
+function add_meta_boxes(){
+  add_meta_box("year_completed-meta", "Year Completed", "year_completed", "rm-menu-entry", "side", "low");
+  add_meta_box("credits_meta", "Design &amp; Build Credits", "credits_meta", "rm-menu-entry", "normal", "low");
+}
+
+function year_completed(){
+  global $post;
+  $custom = get_post_custom($post->ID);
+  $year_completed = $custom["year_completed"][0];
+  ?>
+  <label>Year:</label>
+  <input name="year_completed" value="<?php echo $year_completed; ?>" />
+  <?php
+}
+
+function credits_meta($object, $box) {
+	// var_dump($box); die();
+  // global $post;
+  $custom = get_post_custom($object->ID);
+  $designers = $custom["designers"][0];
+  $developers = $custom["developers"][0];
+  $producers = $custom["producers"][0];
+	var_dump($custom); die();
+  ?>
+  <p><label>Designed By:</label><br />
+  <textarea cols="50" rows="5" name="designers[0]"><?php echo $custom["designers"][0]; ?></textarea></p>
+
+  <p><label>Designed By:</label><br />
+  <textarea cols="50" rows="5" name="designers[1]"><?php echo $custom["designers"][1]; ?></textarea></p>
+
+
+
+  <p><label>Built By:</label><br />
+  <textarea cols="50" rows="5" name="developers"><?php echo $developers; ?></textarea></p>
+  <p><label>Produced By:</label><br />
+  <textarea cols="50" rows="5" name="producers"><?php echo $producers; ?></textarea></p>
+  <?php
+}
+
+add_action('save_post', 'save_details');
+
+function save_details ($post_id) {
+  // global $post;
+
+  var_dump($_POST); die();
+
+  update_post_meta($post_id, "year_completed", $_POST["year_completed"]);
+  update_post_meta($post_id, "designers", $_POST["designers"]);
+  update_post_meta($post_id, "developers", $_POST["developers"]);
+  update_post_meta($post_id, "producers", $_POST["producers"]);
+}*/
 
 // Custom taxonomy for Menu Types
 
@@ -193,6 +332,8 @@ function rm_menu_entry_meta_box( $object, $box ) { ?>
 /* Save the meta box's post metadata. */
 function rm_save_menu_entry_meta( $post_id, $post ) {
 
+	// var_dump($_POST); die();
+
 	/* Verify the nonce before proceeding. */
 	if ( !isset( $_POST['rm_menu_entry_nonce'] ) || !wp_verify_nonce( $_POST['rm_menu_entry_nonce'], basename( __FILE__ ) ) )
 		return $post_id;
@@ -224,6 +365,11 @@ function rm_save_menu_entry_meta( $post_id, $post ) {
 	/* If there is no new meta value but an old value exists, delete it. */
 	elseif ( '' == $new_meta_value && $meta_value )
 		delete_post_meta( $post_id, $meta_key, $meta_value );
+
+	// update_post_meta($post_id, "year_completed", $_POST["year_completed"]);
+	// update_post_meta($post_id, "designers", $_POST["designers"]);
+	// update_post_meta($post_id, "developers", $_POST["developers"]);
+	// update_post_meta($post_id, "producers", $_POST["producers"]);
 }
 
 // Hide Custom Fields Box
@@ -558,12 +704,24 @@ add_filter( 'the_content', 'rm_single_item_content', 20 );
 function rm_single_item_content( $content ) {
 
     if ( 'rm-menu-entry' == get_post_type(get_the_ID() ) AND is_single() ) :
-	wp_enqueue_style('restaurant-menu-css', plugins_url('/restaurant-menu-css.css',__FILE__));
-	$price = __('Price:', 'rm-menu-text-domain');
-	$content .= sprintf(
-            '<div class="menu-entry-meta"><span class="price-text">%1$s %2$s</span></div> ', $price, display_entry_price(), 'restaurant-menu-manager',
-            $content
-        );
+			wp_enqueue_style('restaurant-menu-css', plugins_url('/restaurant-menu-css.css',__FILE__));
+			$price = __('Price:', 'rm-menu-text-domain');
+
+			$prices = get_post_meta(get_the_ID(), 'prices', false);
+
+			if ( $prices && count( $prices[0] ) > 0 ) {
+				foreach( $prices[0] as $track ) {
+				    if ( sizeof( $track['title'] ) || sizeof( $track['track'] ) ) {
+				        $content .= sprintf('<p>%1$s: %2$s</p>', $track['title'], $track['track'], false);
+				    }
+				}
+			}
+
+		// $content .= sprintf(
+		//      '<div class="menu-entry-meta"><span class="price-text">%1$s %2$s</span></div> ', $price, display_entry_price(), 'restaurant-menu-manager',
+		//      $content
+		//    );
+
 		endif;
     return $content;
 
