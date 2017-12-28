@@ -435,7 +435,12 @@ wp_enqueue_style('restaurant-menu-css', plugins_url('/restaurant-menu-css.css',_
 
 if (!is_array ($atts) ) :
 
-$menu_types = get_terms( 'rm-menu-type');
+$menu_types = get_terms(array(
+  'taxonomy' => 'rm-menu-type',
+  'hide_empty' => false,
+  // 'meta_key' => 'tax_position',
+  // 'orderby' => 'tax_position'
+));
 
 foreach ( $menu_types as $menu_type ) {
 $args = array(
@@ -517,7 +522,12 @@ wp_enqueue_script('rm-jquery-accordion');
 // First we will query terms in taxonomy menu type
 // then for each menu type we will fetch entries
 
-$menu_types = get_terms( 'rm-menu-type');
+$menu_types = get_terms(array(
+  'taxonomy' => 'rm-menu-type',
+  'hide_empty' => false,
+  // 'meta_key' => 'tax_position',
+  // 'orderby' => 'tax_position'
+));
 
 foreach ( $menu_types as $menu_type ) {
 $args = array(
@@ -594,35 +604,40 @@ wp_enqueue_script('rm-jquery-tabs');
 // First we will query terms in taxonomy menu type
 // then for each menu type we will fetch entries
 ?>
-<div id="tabs">
+<div id="tabs" class="row">
 
-<ul>
+<ul class="col-md-3 col-xl-2">
 
-<?php
-$menu_types = get_terms( 'rm-menu-type');
+	<?php
+	$menu_types = get_terms(array(
+	  'taxonomy' => 'rm-menu-type',
+	  'hide_empty' => false,
+	  // 'meta_key' => 'tax_position',
+	  // 'orderby' => 'tax_position'
+	));
 
-//list tabs first
-$tab_count = 1;
-foreach ( $menu_types as $menu_type ) {
-$args = array(
-	'post_type' => 'rm-menu-entry',
-	'nopaging'	=> true,
-	'tax_query' => array(
-		array(
-			'taxonomy' => 'rm-menu-type',
-			'field' => 'slug',
-			'terms' => $menu_type
+	//list tabs first
+	$tab_count = 1;
+	foreach ( $menu_types as $menu_type ) {
+	$args = array(
+		'post_type' => 'rm-menu-entry',
+		'nopaging'	=> true,
+		'tax_query' => array(
+			array(
+				'taxonomy' => 'rm-menu-type',
+				'field' => 'slug',
+				'terms' => $menu_type
+			)
 		)
-	)
-);
+	);
 
 
-?>
-<li><a href="#tabs-<?php echo $tab_count;?>"><?php echo $menu_type->name; ?></a></li>
-<?php
-$tab_count++;
-}
-?>
+	?>
+	<li><a href="#<?php echo $menu_type->slug;?>"><?php echo $menu_type->name; ?></a></li>
+	<?php
+	$tab_count++;
+	}
+	?>
 </ul>
 
 <?php
@@ -639,51 +654,71 @@ $args = array(
 		)
 	)
 );
+	// echo $menu_type->slug;
 ?>
 
-<div id="tabs-<?php echo $tab_count;?>">
 
-<?php $the_query = new WP_Query( $args );
-if ( $the_query->have_posts() ) :
+<div id="<?php echo $menu_type->slug;?>" class="col-md-9 col-xl-10 menu-itens">
+  <div class="row">
+	<?php $the_query = new WP_Query( $args );
+	if ( $the_query->have_posts() ) :
 
-if ( ! function_exists('new_excerpt_more') ) {
-	function new_excerpt_more( $more ) {
-	$moretext = __('Learn More...', 'restaurant-menu-manager' );
-	return ' <a class="learn-more" href="'. get_permalink( get_the_ID() ) . '"> ' . $moretext .'</a>';
-}
-add_filter( 'excerpt_more', 'new_excerpt_more' );
-}
+	if ( ! function_exists('new_excerpt_more') ) {
+		function new_excerpt_more( $more ) {
+		$moretext = __('Learn More...', 'restaurant-menu-manager' );
+		return ' <a class="learn-more" href="'. get_permalink( get_the_ID() ) . '"> ' . $moretext .'</a>';
+	}
+	add_filter( 'excerpt_more', 'new_excerpt_more' );
+	}
 
- while ( $the_query->have_posts() ) : $the_query->the_post(); ?>
+	while ( $the_query->have_posts() ) : $the_query->the_post(); ?>
+    <div class="col-md-4 menu-item">
+  	  <a href="<?php the_permalink() ?>" rel="bookmark" title="<?php _e( 'Learn more about: ', 'restaurant-menu-manager' ); ?><?php the_title_attribute(); ?>">
+    		<?php if ( has_post_thumbnail() ) {?>
+    		  <div class="menu-entry-thumbnail">
+    		    <?php the_post_thumbnail('thumbnail'); ?>
+    		  </div>
+    		<?php }  ?>
+        <h6><?php the_title(); ?></h6>
 
-    <h3><a href="<?php the_permalink() ?>" rel="bookmark" title="<?php _e( 'Learn more about: ', 'restaurant-menu-manager' ); ?><?php the_title_attribute(); ?>"><?php the_title(); ?></a></h3>
+        <?php
+
+        $prices = get_post_meta(get_the_ID(), 'prices', false);
+        // var_dump($prices);
+
+        if ( $prices && count( $prices[0] ) > 0 ) {
+          foreach( $prices[0] as $track ) {
+              if ( sizeof( $track['title'] ) || sizeof( $track['track'] ) ) {
+                  echo sprintf('<p>%1$s: %2$s</p>', $track['title'], $track['track'], false);
+              }
+          }
+        }
+
+        ?>
+
+    		<!-- <div class="menu-entry-excerpt"><?php the_excerpt(); ?></div> -->
+    		<!-- <div class="entry-tags">
+    		  <?php	the_terms( $the_query->ID, 'rm-entry-tags', 'Entry Tags: ' , ' / ' ); ?>
+    		</div> -->
+    		<!-- <div class="menu-entry-meta"><span class="price-text"><?php _e('Price:', 'restaurant-menu-manager'); ?></span>
+    		  <?php 	echo display_entry_price(); 	?>
+    		</div> -->
+      </a>
+    </div>
+	<?php endwhile; ?>
+
+
+	  <?php wp_reset_postdata(); ?>
+
+	<?php else:  ?>
+	  <p><?php _e( 'Sorry, no posts matched your criteria.' ); ?></p>
+	<?php endif; ?>
+  </div>
+</div>
 	<?php
-	if ( has_post_thumbnail() ) {
-	?>
-	<div class="menu-entry-thumbnail">
-	<?php the_post_thumbnail('thumbnail'); ?>
-	</div>
-	<?php }  ?>
-
-	<div class="menu-entry-excerpt"><?php the_excerpt(); ?></div>
-	<div class="entry-tags">
-	<?php	the_terms( $the_query->ID, 'rm-entry-tags', 'Entry Tags: ' , ' / ' ); ?>
-	</div>
-	<div class="menu-entry-meta"><span class="price-text"><?php _e('Price:', 'restaurant-menu-manager'); ?></span>
-	<?php 	echo display_entry_price(); 	?>
-	</div>
-  <?php endwhile; ?>
-	</div>
-
-
-  <?php wp_reset_postdata(); ?>
-
-<?php else:  ?>
-  <p><?php _e( 'Sorry, no posts matched your criteria.' ); ?></p>
-<?php endif;
-	$tab_count++;
-    } ?>
-	</div>
+		$tab_count++;
+	    } ?>
+</div>
 <?php
 
 
