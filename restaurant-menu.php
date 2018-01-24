@@ -606,7 +606,7 @@ wp_enqueue_script('rm-jquery-tabs');
 ?>
 <div id="tabs" class="row">
 
-<ul class="col-md-3 col-xl-2">
+<ul class="col-md-3">
 
 	<?php
 	$menu_types = get_terms(array(
@@ -658,7 +658,7 @@ $args = array(
 ?>
 
 
-<div id="<?php echo $menu_type->slug;?>" class="col-md-9 col-xl-10 menu-itens">
+<div id="<?php echo $menu_type->slug;?>" class="col-md-9 menu-itens">
   <div class="row">
 	<?php $the_query = new WP_Query( $args );
 	if ( $the_query->have_posts() ) :
@@ -673,28 +673,40 @@ $args = array(
 
 	while ( $the_query->have_posts() ) : $the_query->the_post(); ?>
     <div class="col-md-4 menu-item">
-  	  <a href="<?php the_permalink() ?>" rel="bookmark" title="<?php _e( 'Learn more about: ', 'restaurant-menu-manager' ); ?><?php the_title_attribute(); ?>">
+  	  <!-- <a href="<?php the_permalink() ?>" rel="bookmark" title="<?php _e( 'Learn more about: ', 'restaurant-menu-manager' ); ?><?php the_title_attribute(); ?>"> -->
     		<?php if ( has_post_thumbnail() ) {?>
     		  <div class="menu-entry-thumbnail">
-    		    <?php the_post_thumbnail('thumbnail'); ?>
+    		    <?php the_post_thumbnail('item-thumb'); ?>
     		  </div>
-    		<?php }  ?>
-        <h6><?php the_title(); ?></h6>
-
+    		<?php } else { ?>
+          <div class="menu-entry-thumbnail">
+            <img width="255" height="255">
+          </div>
+        <?php } ?>
+        <div class="prices">
         <?php
-
         $prices = get_post_meta(get_the_ID(), 'prices', false);
-        // var_dump($prices);
-
-        if ( $prices && count( $prices[0] ) > 0 ) {
+        if ($prices && count($prices[0]) > 3) {
           foreach( $prices[0] as $track ) {
-              if ( sizeof( $track['title'] ) || sizeof( $track['track'] ) ) {
-                  echo sprintf('<p>%1$s: %2$s</p>', $track['title'], $track['track'], false);
+              if (sizeof( $track['title']) || sizeof($track['track'])) {
+                  echo sprintf('<div class="multi-price -mini"><h5>%1$s</h5><p>R$ %2$s</p></div>', $track['title'], $track['track'], false);
               }
           }
+        } else if ($prices && count($prices[0]) > 1) {
+          foreach( $prices[0] as $track ) {
+              if (sizeof( $track['title']) || sizeof($track['track'])) {
+                  echo sprintf('<div class="multi-price"><h5>%1$s</h5><p>R$ %2$s</p></div>', $track['title'], $track['track'], false);
+              }
+          }
+        } else if ($prices && count($prices[0]) == 1) {
+          $track = array_pop($prices[0]);
+          if (sizeof( $track['title']) || sizeof($track['track'])) {
+              echo sprintf('<div class="single-price"><h4>%1$s</h4><p>R$ %2$s</p></div>', $track['title'], $track['track'], false);
+          }
         }
-
         ?>
+        </div>
+        <h6><?php the_title(); ?></h6>
 
     		<!-- <div class="menu-entry-excerpt"><?php the_excerpt(); ?></div> -->
     		<!-- <div class="entry-tags">
@@ -703,7 +715,7 @@ $args = array(
     		<!-- <div class="menu-entry-meta"><span class="price-text"><?php _e('Price:', 'restaurant-menu-manager'); ?></span>
     		  <?php 	echo display_entry_price(); 	?>
     		</div> -->
-      </a>
+      <!-- </a> -->
     </div>
 	<?php endwhile; ?>
 
@@ -760,6 +772,69 @@ function rm_single_item_content( $content ) {
 		endif;
     return $content;
 
+}
+
+add_action( 'wp_ajax_nopriv_restaurant_menu', 'restaurant_menu' );
+
+function restaurant_menu() {
+
+  $menu_types = get_terms(array(
+    'taxonomy' => 'rm-menu-type',
+    'hide_empty' => false,
+    // 'meta_key' => 'tax_position',
+    // 'orderby' => 'tax_position'
+  ));
+
+  $menus = array();
+
+  foreach ( $menu_types as $menu_type ) {
+
+    $menu = array(
+      'name'    => $menu_type->name,
+      'slug'    => $menu_type->slug,
+      'products' => array()
+    );
+
+    $args = array(
+      'post_type' => 'rm-menu-entry',
+      'nopaging'  => true,
+      'tax_query' => array(
+        array(
+          'taxonomy' => 'rm-menu-type',
+          'field' => 'slug',
+          'terms' => $menu_type
+        )
+      )
+    );
+
+    $the_query = new WP_Query( $args );
+
+    while ( $the_query->have_posts() ) {
+      $the_query->the_post();
+
+      $product = [
+        'title'  => get_the_title(),
+        'prices' => []//get_post_meta(get_the_ID(), 'prices', false)[0]
+      ];
+
+      foreach (get_post_meta(get_the_ID(), 'prices', false)[0] as $price) {
+        $product['prices'][] = [
+          'title' => $price['title'],
+          // 'track' => number_format($price['track'])
+          'track' => ($price['track']+0)
+        ];
+        // var_dump($product['prices']);
+        // die();
+      }
+
+      $menu['products'][] = $product;
+    }
+
+    $menus[$menu_type->slug] = $menu;
+  }
+
+  // var_dump($menus);
+  die(json_encode($menus));
 }
 
 ?>
